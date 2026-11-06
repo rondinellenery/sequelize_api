@@ -1,0 +1,150 @@
+[1mdiff --git a/controllers/usuarioController.js b/controllers/usuarioController.js[m
+[1mindex 6a2894e..59a05f9 100644[m
+[1m--- a/controllers/usuarioController.js[m
+[1m+++ b/controllers/usuarioController.js[m
+[36m@@ -1,19 +1,110 @@[m
+[31m-const usuarioReqDto= require("../dtos/usuarioReqDto")[m
+[31m-const usuarioResDto= require("../dtos/usuarioReqDto")[m
+[32m+[m[32mconst { sendVerification } = require("../utils/emailService");[m
+[32m+[m[32mconst usuarioReqDto = require("../dtos/usuarioReqDto");[m
+[32m+[m[32mconst usuarioResDto = require("../dtos/usuarioResDto");[m
+[32m+[m[32mconst { Usuario } = require("../models");[m
+[32m+[m[32mconst { where } = require("sequelize");[m
+ const bcrypt = require('bcrypt');[m
+[31m-const {Usuario} = require ("../models")[m
+[31m-[m
+[31m-exports.criarUsuario = async(req,res) => {[m
+[31m-try {[m
+[31m-    const dados= usuarioReqDto.toEntity(req.body);[m
+[31m-    const senhaHash = await bcrypt.hash(dados.senha, 12);[m
+[31m-    dados.senha= senhaHash;[m
+[31m-[m
+[31m-    const usuario = await Usuario.create(dados);//sequelize[m
+[31m-    res.status(201).json(usuarioReqDto.fromEntity (usuario));[m
+[31m-} catch(e){[m
+[31m-    res.status(400).json({erro: e.message});[m
+[31m-    [m
+[32m+[m[32mconst crypto = require('crypto');[m
+[32m+[m[32mconst { error } = require("console");[m
+[32m+[m
+[32m+[m
+[32m+[m[32mexports.criarUsuario = async (req, res) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const dados = usuarioReqDto.toEntity(req.body);[m
+[32m+[m[32m        const usuarioExistente = await Usuario.findOne({ where: {email: dados.email}});[m
+[32m+[m[32m        if (usuarioExistente) {[m
+[32m+[m[32m            res.status(409).json({ erro: 'Já existe um usuário com esse e-mail!' })[m
+[32m+[m[32m        }[m
+[32m+[m[32m        const senhaHash = await bcrypt.hash(dados.senha, 12);[m
+[32m+[m[32m        dados.senha = senhaHash;[m
+[32m+[m
+[32m+[m[32m        const usuario = await Usuario.create(dados); //sequelize[m
+[32m+[m[32m        res.status(201).json(usuarioResDto.fromEntity(usuario));[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        res.status(400).json({ erro: e.message });[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexports.buscarUsuarioPorId = async (req, res) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const usuario = await Usuario.findByPk(req.params.id);[m
+[32m+[m
+[32m+[m[32m        if (!usuario) {[m
+[32m+[m[32m            return res.status(400).json({[m
+[32m+[m[32m                erro: 'Usuário não encontrado!'[m
+[32m+[m[32m            });[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        res.json(usuarioResDto.fromEntity(usuario));[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        res.status(400).json({ erro: e.message });[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m[32mexports.listarUsuarios = async (req, res) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const usuarios = await Usuario.findAll(); //sequelize[m
+[32m+[m[32m        const resultado = usuarios.map(usuarioResDto.fromEntity);[m
+[32m+[m[32m        res.json(resultado);[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        res.status(400).json({ erro: e.message });[m
+[32m+[m[32m    }[m
+ }[m
+ [m
+[32m+[m[32mexports.solicitarVerificacao = async (req, res) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const { email } = req.body;[m
+[32m+[m[32m        const usuario = await Usuario.findOne({ where: { email } });[m
+[32m+[m
+[32m+[m[32m        if (!usuario) {[m
+[32m+[m[32m            return res.status(404).json({ erro: 'Usuário não encontrado.' });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        if (usuario.emailVerificado) {[m
+[32m+[m[32m            return res.status(400).json({ erro: 'Email já verificado.' })[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        const codigoVerificacao = crypto.randomInt(100000, 999999).toString();[m
+[32m+[m[32m        const codigoExpiracao = new Date(Date.now() + 5 * 60 * 1000);[m
+[32m+[m
+[32m+[m[32m        await usuario.update({[m
+[32m+[m[32m            codigoVerificacao,[m
+[32m+[m[32m            codigoExpiracao[m
+[32m+[m[32m        });[m
+[32m+[m
+[32m+[m[32m        const emailEnviado = sendVerification(email, codigoVerificacao);[m
+[32m+[m[32m        if (!emailEnviado) {[m
+[32m+[m[32m            return res.status(400).json({ erro: 'Erro ao enviar verificação!' });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        res.json({ message: 'Código de verificação enviado!' });[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        res.status(400).json({ erro: e.message });[m
+[32m+[m[32m    }[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexports.verificarEmail = async (req, res) => {[m
+[32m+[m[32m    try {[m
+[32m+[m[32m        const { email, codigo } = req.body;[m
+[32m+[m[32m        const usuario = await Usuario.findOne({ where: {email} });[m
+[32m+[m
+[32m+[m[32m        if (!usuario) {[m
+[32m+[m[32m            return res.status(404).json({ erro: 'Usuário não encontrado.' });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        if (usuario.emailVerificado) {[m
+[32m+[m[32m            return res.status(400).json({ erro: 'Usuário já verificado.' });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        if (usuario.codigoVerificacao !== codigo) {[m
+[32m+[m[32m            return res.status(401).json({ erro: 'Código inválido.' });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        if (new Date() > usuario.codigoExpiracao) {[m
+[32m+[m[32m            return res.status(401).json({ erro: 'Código expirado.' });[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        await usuario.update({[m
+[32m+[m[32m            emailVerificado: true,[m
+[32m+[m[32m            codigoVerificacao: null,[m
+[32m+[m[32m            codigoExpiracao: null[m
+[32m+[m[32m        });[m
+[32m+[m[32m        res.json({ message: 'Email verificado com sucesso!' });[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m        res.status(400).json({ erro: e.message });[m
+[32m+[m[32m    }[m
+ }[m
+\ No newline at end of file[m
+[1mdiff --git a/routes/usuarioRoutes.js b/routes/usuarioRoutes.js[m
+[1mindex efc29d8..a278bd1 100644[m
+[1m--- a/routes/usuarioRoutes.js[m
+[1m+++ b/routes/usuarioRoutes.js[m
+[36m@@ -1,7 +1,11 @@[m
+[31m-const usuarioController = require('../controllers/usuarioController');[m
+[31m-const express= require('express');[m
+[32m+[m[32mconst usuarioController = require('../controllers/usuarioController')[m
+[32m+[m[32mconst express = require('express');[m
+ const router = express.Router();[m
+ [m
+ router.post('/', usuarioController.criarUsuario);[m
+[32m+[m[32mrouter.get('/', usuarioController.listarUsuarios);[m
+[32m+[m[32mrouter.get('/:id', usuarioController.buscarUsuarioPorId);[m
+[32m+[m[32mrouter.post('/solicitar', usuarioController.solicitarVerificacao);[m
+[32m+[m[32mrouter.post('/verificar', usuarioController.verificarEmail);[m
+ [m
+ module.exports = router;[m
+\ No newline at end of file[m

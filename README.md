@@ -1,4 +1,3 @@
-# sequelize_api
 # Projeto de API com express e sequelize-cli
 
 ## Iniciar um projeto node
@@ -37,6 +36,8 @@ npx sequelize-cli model:generate --name Turma --attributes nome:string,ano:integ
 npx sequelize-cli model:generate --name AlunoTurma --attributes alunoId:integer,turmaId:integer
 
 npx sequelize-cli model:generate --name Avaliacao --attributes alunoId:integer,turmaId:integer,professorId:integer,nota:decimal,dataAvaliacao:date,observacao:string
+
+npx sequelize-cli model:generate --name add-unique-index-to-usuario-email
 ```
 
 ## Executa as migrations no banco
